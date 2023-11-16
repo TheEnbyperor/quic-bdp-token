@@ -1,0 +1,194 @@
+<?xml version="1.0" encoding="utf-8"?>
+<?xml-model href="rfc7991bis.rnc"?>
+<!DOCTYPE rfc [
+        <!ENTITY nbsp    "&#160;">
+        <!ENTITY zwsp   "&#8203;">
+        <!ENTITY nbhy   "&#8209;">
+        <!ENTITY wj     "&#8288;">
+]>
+<rfc xmlns:xi="http://www.w3.org/2001/XInclude"
+     ipr="trust200902" submissionType="IETF" category="std" version="3" docName="draft-misell-quic-bdp-token-latest">
+    <front>
+        <title abbrev="QUIC BDP Tokens">QUIC Bandwidth Delay Product Tokens</title>
+        <seriesInfo name="Internet-Draft" status="standard" value="draft-misell-quic-bdp-token-latest"/>
+        <author fullname="Q Misell" initials="Q" surname="Misell">
+            <organization abbrev="AS207960">AS207960 Cyfyngedig</organization>
+            <address>
+                <postal>
+                    <street>13 Pen-y-lan Terrace</street>
+                    <city>Caerdydd</city>
+                    <code>CF23 9EU</code>
+                    <country>United Kingdom</country>
+                </postal>
+                <email>q@as207970.net</email>
+                <email>q@magicalcodewit.ch</email>
+                <uri>https://magicalcodewit.ch</uri>
+            </address>
+        </author>
+        <area>tsv</area>
+        <workgroup>QUIC</workgroup>
+        <abstract>
+            <t>This document describes a method to store previously calculated Congestion Control parameters on a QUIC
+                client to allow additional capacity on high Bandwidth Delay Product paths to be used with
+                Careful Resume.</t>
+        </abstract>
+    </front>
+
+    <middle>
+        <section>
+            <name>Introduction</name>
+            <t>This document describes a method for a QUIC server to send calculated Congestion Control parameters
+                to a client for storage and later use on a future connection with Careful Resume
+                <xref target="I-D.ietf-tsvwg-careful-resume"/>. It also allows the client to inspect CC parameters,
+                and allows the client not use them with new connections if its aware of a significant change in the
+                BDP of the path.</t>
+
+            <section>
+                <name>Requirements Language</name>
+                <t>The key words <bcp14>MUST</bcp14>, <bcp14>MUST NOT</bcp14>, <bcp14>REQUIRED</bcp14>, <bcp14>SHALL</bcp14>,
+                    <bcp14>SHALL NOT</bcp14>, <bcp14>SHOULD</bcp14>, <bcp14>SHOULD NOT</bcp14>, <bcp14>RECOMMENDED</bcp14>,
+                    <bcp14>NOT RECOMMENDED</bcp14>, <bcp14>MAY</bcp14>, and <bcp14>OPTIONAL</bcp14> in this document are to be
+                    interpreted as described in <xref target="BCP14"/> when, and only when, they appear in all capitals,
+                    as shown here.</t>
+            </section>
+        </section>
+        <section>
+            <name>BDP Tokens</name>
+            <t>The address validation token is overloaded to also store CC information. This has the advantage that a
+                QUIC client unaware of this document will still be able to make use of this specification without
+                modification. QUIC<xref target="RFC9000"/> defines an address validation token as an opaque blob that
+                the client should not inspect. This document extends this by providing some structure token, whilst
+                still providing fields for server specific information.</t>
+            <t>The format of a token containing BDP information is defined as follows:</t>
+            <figure align="left" suppress-title="false">
+                <name>BDP Token</name>
+                <artwork name="" type="" align="left" alt="">
+                    BDP Token {
+                        Address Validation Length (i),
+                        Address Validation (..),
+                        BDP Data Length (i),
+                        BDP Data Value(..),
+                        Saved Capacity (i),
+                        Saved RTT (i)
+                    }
+                </artwork>
+            </figure>
+            <t>The fields are as follows:</t>
+            <dl>
+                <dt>Address Validation Length</dt>
+                <dd>
+                    A variable-length integer specifying the length of the Address Validation field, in bytes.
+                    A value of 0 indicates that the server is not using address validation and is using the token purely
+                    for CC information.
+                </dd>
+                <dt>Address Validation</dt>
+                <dd>
+                    Opaque information specific to the server that it will use for address validation.
+                    The construction of this field <bcp14>MUST</bcp14> comply with the requirements of
+                    <xref target="RFC9000"/> section 8.1.
+                </dd>
+                <dt>CC Data Length</dt>
+                <dd>
+                    A variable-length integer specifying the length of the CC Data field, in bytes.
+                    A value of 0 indicates that the server is not using CC Data, and that the Saved Capacity and
+                    Saved RTT fields should also be ignored.
+                </dd>
+                <dt>CC Data</dt>
+                <dd>
+                    Opaque information specific to the server that it will use to prime its congestion controller state.
+                    This field <bcp14>SHOULD</bcp14> contain expiration/lifetime information, and any additional
+                    information that the server may need to validate that the same path is being used, such as an
+                    endpoint token defined in <xref target="I-D.ietf-tsvwg-careful-resume"/>.
+                    The data <bcp14>MUST</bcp14> be signed, or otherwise processed against modification by the client.
+                </dd>
+                <dt>Capacity</dt>
+                <dd>
+                    The estimated capacity of the path in bytes, encoded as a variable-length integer.
+                    The exact CC state value used is left to server preference.
+                </dd>
+                <dt>RTT</dt>
+                <dd>
+                    The RTT of the path in microseconds, encoded as a variable-length integer.
+                    The exact CC state value used is left to server preference.
+                </dd>
+            </dl>
+            <t>The Capacity and RTT fields are merely hints to the client and the server
+                <bcp14>MUST</bcp14> not use these fields when priming its congestion controller state. If it wishes
+                to use these parameters it will have to also include them in its CC Data structure, as data in this
+                field is protected against modification by the client.</t>
+        </section>
+        <section>
+            <name>Extension signalling</name>
+            <t>The server can send the above extended BDP token to all clients without further negotiation. However
+                a client needs some way to know that there is meaningful structure to a token its received from the
+                server. To this end a new transport parameter is defined.</t>
+            <dl>
+                <dt>bdp_token (0xTBD)</dt>
+                <dd>
+                    The bdp_token transport parameter is a boolean value that indicates that the server is using
+                    BDP tokens. It can have the following values:
+                    <list style="symbols">
+                        <t>0, default value: BDP Tokens are not in use.</t>
+                        <t>1: BDP Tokens are in use.</t>
+                    </list>
+                </dd>
+            </dl>
+        </section>
+
+        <section anchor="IANA">
+            <name>IANA Considerations</name>
+            <section>
+                <name>QUIC Transport Parameters</name>
+                <t>Per this document, one new entry has been added to the "QUIC Transport Parameters" registry defined in
+                    <xref target="RFC9000"/> section 22.3. This entry is defined below:</t>
+                <table>
+                    <name>New entries</name>
+                    <thead>
+                        <tr>
+                            <th>Value</th>
+                            <th>Status</th>
+                            <th>Specification</th>
+                            <th>Parameter name</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>0xTBD</td>
+                            <td>Provisional</td>
+                            <td>This document</td>
+                            <td>bdp_frame</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </section>
+        </section>
+
+        <section anchor="Security">
+            <name>Security Considerations</name>
+            <t>The CC Data field <bcp14>MUST</bcp14> be protected against manipulation by malicious clients.
+                A client that can modify CC calculations could otherwise cause overload of the network path.</t>
+            <t>The Capacity and RTT fields are hints to the client and not protected from modification by a client. The
+                server <bcp14>MUST</bcp14> ignore when processing a received BDP token.</t>
+        </section>
+    </middle>
+
+    <back>
+        <references>
+            <name>References</name>
+            <references>
+                <name>Normative References</name>
+
+                <referencegroup anchor="BCP14" target="https://www.rfc-editor.org/info/bcp14">
+                    <xi:include href="https://www.rfc-editor.org/refs/bibxml/reference.RFC.2119.xml"/>
+                    <xi:include href="https://www.rfc-editor.org/refs/bibxml/reference.RFC.8174.xml"/>
+                </referencegroup>
+                <xi:include href="https://www.rfc-editor.org/refs/bibxml/reference.RFC.9000.xml"/>
+            </references>
+            <references>
+                <name>Informative References</name>
+
+                <xi:include href="https://datatracker.ietf.org/doc/bibxml3/draft-ietf-tsvwg-careful-resume-04.xml"/>
+            </references>
+        </references>
+    </back>
+</rfc>
