@@ -63,14 +63,14 @@
             <figure align="left" suppress-title="false">
                 <name>BDP Token</name>
                 <artwork name="" type="" align="left" alt="">
-                    BDP Token {
-                        Address Validation Length (i),
-                        Address Validation (..),
-                        BDP Data Length (i),
-                        BDP Data Value(..),
-                        Saved Capacity (i),
-                        Saved RTT (i)
-                    }
+BDP Token {
+    Address Validation Length (i),
+    Address Validation (..),
+    BDP Data Length (i),
+    BDP Data Value(..),
+    Saved Capacity (i),
+    Saved RTT (i)
+}
                 </artwork>
             </figure>
             <t>The fields are as follows:</t>
@@ -126,11 +126,9 @@
                 <dt>bdp_token (0xTBD)</dt>
                 <dd>
                     The bdp_token transport parameter is a boolean value that indicates that the server is using
-                    BDP tokens. It can have the following values:
-                    <list style="symbols">
-                        <t>0, default value: BDP Tokens are not in use.</t>
-                        <t>1: BDP Tokens are in use.</t>
-                    </list>
+                    BDP tokens. It can have the following values:<br/>
+                    - 0, default value: BDP Tokens are not in use.<br/>
+                    - 1: BDP Tokens are in use.
                 </dd>
             </dl>
         </section>
